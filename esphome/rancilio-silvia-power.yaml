@@ -191,6 +191,18 @@ number:
         - script.execute: apply_pid_parameters
 
   - platform: template
+    name: "Silvia Brew Temperature Offset"
+    id: silvia_brew_temperature_offset
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    min_value: -20
+    max_value: 30
+    step: 0.1
+    unit_of_measurement: "°C"
+    mode: box
+
+  - platform: template
     name: "Silvia Brew Target"
     id: silvia_brew_target
     optimistic: true
@@ -546,6 +558,33 @@ sensor:
         return id(silvia_steam_target).state;
       }
       return id(silvia_brew_target).state;
+
+  - platform: template
+    name: "Silvia Estimated Brew Temperature"
+    id: silvia_estimated_brew_temperature
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 1s
+    lambda: |-
+      if (!id(silvia_boiler_temp_pt100).has_state()) {
+        return NAN;
+      }
+      return id(silvia_boiler_temp_pt100).state -
+             id(silvia_brew_temperature_offset).state;
+
+  - platform: template
+    name: "Silvia Estimated Brew Target"
+    id: silvia_estimated_brew_target
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 5s
+    lambda: |-
+      return id(silvia_brew_target).state -
+             id(silvia_brew_temperature_offset).state;
 
   - platform: max31865
     name: "Silvia Boiler Temperature PT100"

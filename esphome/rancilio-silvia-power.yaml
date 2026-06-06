@@ -569,7 +569,7 @@ output:
   - platform: slow_pwm
     id: silvia_heater_ssr_pwm
     pin: ${heater_ssr_pin}
-    period: 10s
+    period: 1s
 
   # PID пишет сюда.
   # Сохраняем процент для HA и передаём его в SSR.

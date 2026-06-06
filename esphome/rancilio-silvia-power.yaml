@@ -2,11 +2,14 @@ esphome:
   name: rancilio-silvia-power
   friendly_name: Rancilio Silvia Power
   on_boot:
-    priority: 800
-    then:
-      - switch.turn_off: silvia_power_relay
-      - lambda: |-
-          id(auto_off_remaining_seconds) = 0;
+    - priority: 800
+      then:
+        - switch.turn_off: silvia_power_relay
+        - lambda: |-
+            id(auto_off_remaining_seconds) = 0;
+    - priority: -100
+      then:
+        - script.execute: apply_pid_parameters
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -69,6 +72,56 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+
+  - id: pid_autotune_running
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+  - id: pid_autotune_status
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  - id: pid_autotune_elapsed_seconds
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (!id(pid_autotune_running)) {
+            return;
+          }
+
+          id(pid_autotune_elapsed_seconds)++;
+
+          const float kp = id(silvia_brew_pid).get_kp();
+          const float ki = id(silvia_brew_pid).get_ki();
+          const float kd = id(silvia_brew_pid).get_kd();
+
+          if (std::isfinite(kp) && std::isfinite(ki) && std::isfinite(kd) &&
+              (kp > 0.0f || ki > 0.0f || kd > 0.0f)) {
+            auto kp_call = id(silvia_pid_kp).make_call();
+            kp_call.set_value(kp);
+            kp_call.perform();
+
+            auto ki_call = id(silvia_pid_ki).make_call();
+            ki_call.set_value(ki);
+            ki_call.perform();
+
+            auto kd_call = id(silvia_pid_kd).make_call();
+            kd_call.set_value(kd);
+            kd_call.perform();
+
+            id(pid_autotune_running) = false;
+            id(pid_autotune_status) = 2;
+            id(silvia_pid_autotune_status).publish_state(
+                str_sprintf("Completed | KP %.5f | KI %.5f | KD %.5f", kp, ki, kd));
+            ESP_LOGI("silvia.pid", "Autotune saved: KP %.5f, KI %.5f, KD %.5f", kp, ki, kd);
+          }
     
 # -------------------------
 # Настраиваемые параметры в HA
@@ -99,7 +152,7 @@ number:
     name: "Silvia PID KP"
     id: silvia_pid_kp
     optimistic: true
-    restore_value: false
+    restore_value: true
     initial_value: 0.12492
     min_value: 0.0
     max_value: 50.0
@@ -113,7 +166,7 @@ number:
     name: "Silvia PID KI"
     id: silvia_pid_ki
     optimistic: true
-    restore_value: false
+    restore_value: true
     initial_value: 0.00065
     min_value: 0.0
     max_value: 5.0
@@ -127,7 +180,7 @@ number:
     name: "Silvia PID KD"
     id: silvia_pid_kd
     optimistic: true
-    restore_value: false
+    restore_value: true
     initial_value: 6.00246
     min_value: 0.0
     max_value: 100.0
@@ -415,17 +468,11 @@ button:
             switch.is_on: silvia_power_relay
           then:
             - logger.log: "Silvia PID autotune started"
-
-            # Сначала сбрасываем PID параметры в 0
-            - number.set:
-                id: silvia_pid_kp
-                value: 0.0
-            - number.set:
-                id: silvia_pid_ki
-                value: 0.0
-            - number.set:
-                id: silvia_pid_kd
-                value: 0.0
+            - lambda: |-
+                id(pid_autotune_running) = true;
+                id(pid_autotune_status) = 1;
+                id(pid_autotune_elapsed_seconds) = 0;
+                id(silvia_pid_autotune_status).publish_state("Running | starting");
 
             - climate.pid.set_control_parameters:
                 id: silvia_brew_pid
@@ -441,6 +488,9 @@ button:
                 negative_output: 0.0
           else:
             - logger.log: "Silvia PID autotune blocked: machine power is OFF"
+            - lambda: |-
+                id(pid_autotune_status) = 3;
+                id(silvia_pid_autotune_status).publish_state("Blocked | machine power is OFF");
 
 
 
@@ -557,6 +607,42 @@ text_sensor:
       } else {
         return {"Water LOW"};
       }
+
+  - platform: template
+    name: "Silvia PID Autotune Status"
+    id: silvia_pid_autotune_status
+    update_interval: 2s
+    lambda: |-
+      if (id(pid_autotune_running)) {
+        const int minutes = id(pid_autotune_elapsed_seconds) / 60;
+        const int seconds = id(pid_autotune_elapsed_seconds) % 60;
+
+        if (!id(silvia_power_relay).state) {
+          return {str_sprintf("Running | heater disabled | %02d:%02d", minutes, seconds)};
+        }
+
+        return {str_sprintf(
+            "Running | %02d:%02d | %.1f/%.1f C | %.1f%%",
+            minutes,
+            seconds,
+            id(silvia_boiler_temp_pt100).state,
+            id(silvia_brew_pid).target_temperature,
+            id(pid_heat_output_value) * 100.0f)};
+      }
+
+      if (id(pid_autotune_status) == 2) {
+        return {str_sprintf(
+            "Completed | KP %.5f | KI %.5f | KD %.5f",
+            id(silvia_pid_kp).state,
+            id(silvia_pid_ki).state,
+            id(silvia_pid_kd).state)};
+      }
+
+      if (id(pid_autotune_status) == 3) {
+        return {"Blocked | machine power is OFF"};
+      }
+
+      return {"Idle"};
 
 output:
   - platform: gpio

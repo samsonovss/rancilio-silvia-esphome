@@ -9,6 +9,7 @@
 - целевых температур;
 - коэффициентов `KP`, `KI` и `KD`;
 - PID autotune;
+- статуса PID autotune с временем, температурой и мощностью;
 - таймера автоотключения;
 - уровня воды и текстового статуса.
 
@@ -23,6 +24,7 @@
 - `Silvia PID Mode`;
 - `Silvia Boiler Temperature PT100`;
 - `Silvia PID Heat Output`;
+- `Silvia PID Autotune Status`;
 - `Silvia Auto Off Remaining`;
 - `Silvia Water Status`.
 

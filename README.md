@@ -1,36 +1,36 @@
 # Rancilio Silvia ESPHome
 
-[English version](README.en.md)
+[Русская версия](README.ru.md)
 
-Модернизация кофемашины Rancilio Silvia на базе ESP32-S3, ESPHome и Home Assistant.
+An ESP32-S3, ESPHome, and Home Assistant modernization project for the Rancilio Silvia espresso machine.
 
-Проект управляет питанием и нагревателем кофемашины, измеряет температуру бойлера через PT100 + MAX31865 и поддерживает отдельные PID-режимы приготовления кофе и пара.
+The project controls machine power and boiler heating, measures boiler temperature with a PT100 and MAX31865, and provides separate PID modes for brewing and steaming.
 
 > [!WARNING]
-> В кофемашине присутствует опасное сетевое напряжение и горячий бойлер под давлением. ESPHome не заменяет штатный термостат, термопредохранитель, заземление и другие аппаратные защиты. Не работайте с подключённой к сети машиной.
+> The espresso machine contains hazardous mains voltage and a hot pressurized boiler. ESPHome is not a replacement for the original thermostat, thermal fuse, protective earth, or any other hardware safety device. Never work on the machine while it is connected to mains power.
 
-## Возможности
+## Features
 
-- ESP32-S3 с ESP-IDF
-- интеграция с ESPHome и Home Assistant
-- PT100 через MAX31865, трёхпроводное подключение
-- PID-регулирование нагревателя через SSR
-- режимы `Brew` и `Steam`
-- регулируемые целевые температуры
-- настройка коэффициентов PID и запуск autotune из Home Assistant
-- управление штатной кнопкой питания
-- автоматическое отключение по таймеру
-- статусный светодиод
-- вход датчика уровня воды
-- программная защита от перегрева при 155 °C
-- блокировка SSR при недостоверном показании PT100
+- ESP32-S3 using ESP-IDF
+- ESPHome and Home Assistant integration
+- three-wire PT100 through MAX31865
+- PID heater control through an SSR
+- `Brew` and `Steam` modes
+- adjustable target temperatures
+- PID parameter controls and autotune from Home Assistant
+- original power button support
+- automatic shutdown timer
+- status LED
+- water-level sensor input
+- 155 °C software overtemperature guard
+- SSR lockout when the PT100 reading is invalid
 
-## Структура
+## Repository layout
 
 ```text
 .
 ├── README.md
-├── README.en.md
+├── README.ru.md
 ├── esphome/
 │   ├── rancilio-silvia-power.yaml
 │   └── secrets.example.yaml
@@ -41,35 +41,35 @@
 └── images/
 ```
 
-## Быстрый старт
+## Quick start
 
-1. Установите ESPHome или ESPHome Device Builder в Home Assistant.
-2. Скопируйте `esphome/rancilio-silvia-power.yaml` в каталог конфигурации ESPHome.
-3. Создайте `secrets.yaml` по примеру `esphome/secrets.example.yaml`.
-4. Проверьте назначение GPIO и электрическую схему именно вашей платы.
-5. Выполните проверку конфигурации и только после этого соберите прошивку.
-6. Первое включение нагревателя проводите под постоянным наблюдением.
+1. Install ESPHome or the ESPHome Device Builder add-on in Home Assistant.
+2. Copy `esphome/rancilio-silvia-power.yaml` into the ESPHome configuration directory.
+3. Create `secrets.yaml` using `esphome/secrets.example.yaml`.
+4. Verify every GPIO assignment and the electrical design for your exact board.
+5. Validate the configuration before compiling the firmware.
+6. Keep the machine under constant supervision during the first heater test.
 
-## Основные параметры
+## Default settings
 
-| Параметр | Значение |
+| Setting | Value |
 |---|---:|
-| Температура приготовления | 93 °C |
-| Температура пара | 140 °C |
-| Порог software overtemp | 155 °C |
-| Период управления SSR | 10 секунд |
-| Автоотключение | 60 минут |
+| Brew temperature | 93 °C |
+| Steam temperature | 140 °C |
+| Software overtemperature limit | 155 °C |
+| SSR control period | 10 seconds |
+| Automatic shutdown | 60 minutes |
 
-## Текущий статус
+## Project status
 
-Проект находится в активной разработке. Вход датчика воды назначен на GPIO18, но электрический тип выхода датчика ещё уточняется. Перед использованием необходимо определить, является ли выход NPN/open-collector, PNP или push-pull, и проверить его напряжение.
+This project is under active development. The water-level input is assigned to GPIO18, but the sensor output type is still being identified. Determine whether it uses an NPN/open-collector, PNP, or push-pull output and verify its voltage before connecting it to the ESP32-S3.
 
-## Документация
+## Documentation
 
-- [Подключение и GPIO](docs/wiring.md)
+- [Wiring and GPIO](docs/wiring.md)
 - [Home Assistant](docs/home-assistant.md)
-- [Безопасность](docs/safety.md)
+- [Safety](docs/safety.md)
 
-## Лицензия
+## License
 
-Проект пока опубликован без лицензии. Все права сохраняются за автором.
+No license has been granted yet. All rights are reserved by the author.

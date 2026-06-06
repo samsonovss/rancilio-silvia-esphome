@@ -22,7 +22,7 @@ The project controls machine power and boiler heating, measures boiler temperatu
 - automatic shutdown timer
 - status LED
 - water-level sensor input
-- 155 °C software overtemperature guard
+- configurable software overtemperature guard
 - SSR lockout when the PT100 reading is invalid
 
 ## Repository layout
@@ -50,15 +50,11 @@ The project controls machine power and boiler heating, measures boiler temperatu
 5. Validate the configuration before compiling the firmware.
 6. Keep the machine under constant supervision during the first heater test.
 
-## Default settings
+## Configuration
 
-| Setting | Value |
-|---|---:|
-| Brew temperature | 93 °C |
-| Steam temperature | 140 °C |
-| Software overtemperature limit | 155 °C |
-| SSR control period | 10 seconds |
-| Automatic shutdown | 60 minutes |
+The brew temperature, steam temperature, and automatic shutdown time are adjustable from Home Assistant. Values stored in the YAML file are initial defaults, not fixed machine specifications.
+
+The software overtemperature limit and the SSR `slow_pwm` period are currently firmware settings. Change them in the ESPHome configuration and rebuild the firmware when required.
 
 ## Project status
 

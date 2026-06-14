@@ -79,9 +79,25 @@ The estimated brew temperature is a model, not a direct water measurement. Keep 
 
 The software overtemperature limit is a firmware setting. The heater SSR uses a one-second `slow_pwm` period; changing it may require PID retuning.
 
-## Project status
+## Project Status
 
-This project is under active development. The XKC-Y25-NPN water-level sensor uses an active-low open-collector output on GPIO18 with the ESP32-S3 internal 3.3 V pull-up enabled.
+The project is under active development but is already fully functional and running on a real Rancilio Silvia espresso machine.
+
+The current implementation includes:
+
+* PT100 temperature measurement through MAX31865;
+* PID heater control via SSR;
+* Brew and Steam operating modes;
+* Home Assistant integration through ESPHome;
+* automatic shutdown;
+* water-level monitoring;
+* PID autotune and parameter storage.
+
+At the moment, the system is built as a prototype using an ESP32-S3 development board and point-to-point wiring.
+
+The next major milestone is the development of a dedicated PCB with pluggable connectors for sensors, relays, and peripheral devices. This will improve reliability, simplify assembly, and make the project easier to reproduce for other users.
+
+Testing, hardware refinement, and documentation development are ongoing.
 
 ## Documentation
 

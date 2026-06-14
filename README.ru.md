@@ -1,4 +1,4 @@
-# Rancilio Silvia ESPHome
+# Rancilio Silvia PID ESPHome
 
 [English version](README.md)
 

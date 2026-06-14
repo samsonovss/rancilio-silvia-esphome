@@ -11,7 +11,7 @@ The project controls machine power and boiler heating, measures boiler temperatu
 > [!WARNING]
 > The espresso machine contains hazardous mains voltage and a hot pressurized boiler. ESPHome is not a replacement for the original thermostat, thermal fuse, protective earth, or any other hardware safety device. Never work on the machine while it is connected to mains power.
 
-https://github.com/samsonovss/rancilio-silvia-esphome/blob/main/images/hassio.jpg
+![dashboard](images/hassio.jpg)
 
 https://github.com/user-attachments/assets/92bf4580-1ab9-4535-a1f1-395bb5a3d315
 

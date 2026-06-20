@@ -1,12 +1,14 @@
-# Rancilio Silvia PID ESPHome
+# Rancilio Silvia ESPHome Controller
 
 [Русская версия](README.ru.md)
 
 [Telegram discussion group](https://t.me/Rancilio_Silvia) (Russian and English)
 
-An ESP32-S3, ESPHome, and Home Assistant modernization project for the Rancilio Silvia espresso machine.
+An ESP32-S3, ESPHome, and Home Assistant digital controller project for the Rancilio Silvia espresso machine.
 
 The project controls machine power, boiler heating, brew shot, hot water, and steam mode. It measures boiler temperature with a PT100 and MAX31865, provides separate PID modes for brewing and steaming, and exposes the machine to Home Assistant.
+
+This is not just another external PID retrofit. The goal is a full digital replacement for the machine's control logic: the original mains-voltage control wiring is moved away from the front-panel switches, relays handle the high-voltage loads, and the original user controls become low-voltage GPIO inputs on the ESP32-S3. In principle, the physical switches can be removed entirely and replaced with a touchscreen or another digital user interface.
 
 > [!WARNING]
 > The espresso machine contains hazardous mains voltage and a hot pressurized boiler. ESPHome is not a replacement for the original thermostat, thermal fuse, protective earth, or any other hardware safety device. Never work on the machine while it is connected to mains power.
@@ -28,6 +30,8 @@ https://github.com/user-attachments/assets/92bf4580-1ab9-4535-a1f1-395bb5a3d315
 - PID parameter controls and autotune from Home Assistant
 - automatic saving of successful autotune coefficients
 - original power button support
+- full digital control of power, heater, pump, brew valve, hot water, and steam mode
+- front-panel switches converted from mains control to low-voltage ESP32 GPIO inputs
 - physical low-voltage inputs for brew shot, hot water, and steam mode
 - Home Assistant controls for brew shot, hot water, steam mode, pump relay, and brew-valve relay
 - timed brew shot control
@@ -124,7 +128,7 @@ The current implementation includes:
 * water-level monitoring;
 * PID autotune and parameter storage.
 
-At the moment, the system is built as a prototype using an ESP32-S3 development board and point-to-point wiring.
+At the moment, the system is built as a prototype using an ESP32-S3 development board and point-to-point wiring. The original mains-voltage control wiring has been removed from the control switches during this conversion; high-voltage loads are now switched through the controller's relay outputs.
 
 The next major milestone is the development of a dedicated PCB with pluggable connectors for sensors, relays, and peripheral devices. This will improve reliability, simplify assembly, and make the project easier to reproduce for other users.
 

@@ -4,6 +4,8 @@ esphome:
   on_boot:
     - priority: 800
       then:
+        - switch.turn_off: silvia_pump_relay
+        - switch.turn_off: silvia_brew_valve_relay
         - switch.turn_off: silvia_power_relay
         - lambda: |-
             id(auto_off_remaining_seconds) = 0;
@@ -54,6 +56,11 @@ substitutions:
   button_pin: GPIO5
   led_pin: GPIO6
   heater_ssr_pin: GPIO7
+  brew_button_pin: GPIO8
+  hot_water_button_pin: GPIO9
+  steam_mode_button_pin: GPIO10
+  pump_relay_pin: GPIO16
+  brew_valve_relay_pin: GPIO15
   max31865_cs_pin: GPIO14
   water_level_pin: GPIO18
   overtemp_limit: "155.0"
@@ -87,6 +94,21 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
+
+  - id: brew_profile_applying
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+  - id: brew_shot_running
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+  - id: hot_water_running
+    type: bool
+    restore_value: no
+    initial_value: 'false'
 
 interval:
   - interval: 1s
@@ -206,6 +228,69 @@ number:
         - component.update: silvia_pid_control_temperature
 
   - platform: template
+    name: "Silvia Brew Shot Seconds"
+    id: silvia_brew_shot_seconds
+    optimistic: true
+    restore_value: true
+    initial_value: 25
+    min_value: 1
+    max_value: 90
+    step: 0.5
+    unit_of_measurement: "s"
+    mode: box
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return !id(brew_profile_applying) && id(silvia_brew_profile).current_option() != "Custom";'
+            then:
+              - select.set:
+                  id: silvia_brew_profile
+                  option: "Custom"
+
+  - platform: template
+    name: "Silvia Preinfusion Pump Seconds"
+    id: silvia_preinfusion_pump_seconds
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    min_value: 0
+    max_value: 10
+    step: 0.5
+    unit_of_measurement: "s"
+    mode: box
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return !id(brew_profile_applying) && id(silvia_brew_profile).current_option() != "Custom";'
+            then:
+              - select.set:
+                  id: silvia_brew_profile
+                  option: "Custom"
+
+  - platform: template
+    name: "Silvia Preinfusion Pause Seconds"
+    id: silvia_preinfusion_pause_seconds
+    optimistic: true
+    restore_value: true
+    initial_value: 0
+    min_value: 0
+    max_value: 20
+    step: 0.5
+    unit_of_measurement: "s"
+    mode: box
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return !id(brew_profile_applying) && id(silvia_brew_profile).current_option() != "Custom";'
+            then:
+              - select.set:
+                  id: silvia_brew_profile
+                  option: "Custom"
+
+  - platform: template
     name: "Silvia Brew Target"
     id: silvia_brew_target
     optimistic: true
@@ -266,12 +351,105 @@ switch:
       - output.set_level:
           id: silvia_pid_heat_output
           level: 0%
+      - switch.turn_off: silvia_pump_relay
+      - switch.turn_off: silvia_brew_valve_relay
+      - script.stop: brew_shot_timer
       - script.stop: auto_off_timer
       - script.stop: status_led_blink_slow
       - script.stop: status_led_blink_fast
       - light.turn_off: silvia_status_led_light
       - lambda: |-
           id(auto_off_remaining_seconds) = 0;
+          id(brew_shot_running) = false;
+          id(hot_water_running) = false;
+
+  - platform: gpio
+    name: "Silvia Pump Relay"
+    id: silvia_pump_relay
+    restore_mode: ALWAYS_OFF
+    pin:
+      number: ${pump_relay_pin}
+      inverted: true
+    on_turn_on:
+      - if:
+          condition:
+            switch.is_off: silvia_power_relay
+          then:
+            - switch.turn_off: silvia_pump_relay
+          else:
+            - script.execute: auto_off_timer
+            - script.execute: status_led_update
+
+  - platform: gpio
+    name: "Silvia Brew Valve Relay"
+    id: silvia_brew_valve_relay
+    restore_mode: ALWAYS_OFF
+    pin:
+      number: ${brew_valve_relay_pin}
+      inverted: true
+    on_turn_on:
+      - if:
+          condition:
+            switch.is_off: silvia_power_relay
+          then:
+            - switch.turn_off: silvia_brew_valve_relay
+          else:
+            - script.execute: auto_off_timer
+            - script.execute: status_led_update
+
+  - platform: template
+    name: "Silvia Brew Shot"
+    id: silvia_brew_shot_control
+    lambda: 'return id(brew_shot_running);'
+    turn_on_action:
+      - if:
+          condition:
+            switch.is_on: silvia_power_relay
+          then:
+            - script.execute: auto_off_timer
+            - script.execute: status_led_update
+            - script.execute: brew_shot_timer
+    turn_off_action:
+      - script.stop: brew_shot_timer
+      - switch.turn_off: silvia_pump_relay
+      - switch.turn_off: silvia_brew_valve_relay
+      - lambda: 'id(brew_shot_running) = false;'
+
+  - platform: template
+    name: "Silvia Hot Water"
+    id: silvia_hot_water_control
+    lambda: 'return id(hot_water_running);'
+    turn_on_action:
+      - if:
+          condition:
+            switch.is_on: silvia_power_relay
+          then:
+            - script.execute: auto_off_timer
+            - script.execute: status_led_update
+            - lambda: 'id(hot_water_running) = true;'
+            - switch.turn_on: silvia_pump_relay
+    turn_off_action:
+      - lambda: 'id(hot_water_running) = false;'
+      - if:
+          condition:
+            lambda: 'return !id(brew_shot_running);'
+          then:
+            - switch.turn_off: silvia_pump_relay
+
+  - platform: template
+    name: "Silvia Steam Mode"
+    id: silvia_steam_mode_control
+    lambda: 'return id(silvia_pid_mode).current_option() == "Steam";'
+    turn_on_action:
+      - script.execute: auto_off_timer
+      - script.execute: status_led_update
+      - select.set:
+          id: silvia_pid_mode
+          option: "Steam"
+    turn_off_action:
+      - select.set:
+          id: silvia_pid_mode
+          option: "Brew"
 
 # -------------------------
 # Родная кнопка Power
@@ -305,6 +483,57 @@ binary_sensor:
     filters:
       - delayed_on: 500ms
       - delayed_off: 500ms
+
+  - platform: gpio
+    name: "Silvia Brew Shot Button"
+    id: silvia_brew_shot_button
+    pin:
+      number: ${brew_button_pin}
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    filters:
+      - delayed_on: 30ms
+      - delayed_off: 30ms
+    on_press:
+      - switch.turn_on: silvia_brew_shot_control
+    on_release:
+      - switch.turn_off: silvia_brew_shot_control
+
+  - platform: gpio
+    name: "Silvia Hot Water Button"
+    id: silvia_hot_water_button
+    pin:
+      number: ${hot_water_button_pin}
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    filters:
+      - delayed_on: 30ms
+      - delayed_off: 30ms
+    on_press:
+      - switch.turn_on: silvia_hot_water_control
+    on_release:
+      - switch.turn_off: silvia_hot_water_control
+
+  - platform: gpio
+    name: "Silvia Brew Steam Mode Button"
+    id: silvia_brew_steam_mode_button
+    pin:
+      number: ${steam_mode_button_pin}
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    filters:
+      - delayed_on: 30ms
+      - delayed_off: 30ms
+    on_press:
+      - switch.turn_on: silvia_steam_mode_control
+    on_release:
+      - switch.turn_off: silvia_steam_mode_control
         
 # -------------------------
 # Автоотключение
@@ -312,6 +541,40 @@ binary_sensor:
 # -------------------------
 
 script:
+  - id: brew_shot_timer
+    mode: restart
+    then:
+      - if:
+          condition:
+            switch.is_on: silvia_power_relay
+          then:
+            - lambda: |-
+                id(brew_shot_running) = true;
+                id(hot_water_running) = false;
+            - switch.turn_on: silvia_brew_valve_relay
+            - if:
+                condition:
+                  lambda: 'return id(silvia_preinfusion_pump_seconds).state > 0.0f;'
+                then:
+                  - switch.turn_on: silvia_pump_relay
+                  - delay: !lambda |-
+                      return (uint32_t)(id(silvia_preinfusion_pump_seconds).state * 1000.0f);
+                  - switch.turn_off: silvia_pump_relay
+            - if:
+                condition:
+                  lambda: 'return id(silvia_preinfusion_pause_seconds).state > 0.0f;'
+                then:
+                  - delay: !lambda |-
+                      return (uint32_t)(id(silvia_preinfusion_pause_seconds).state * 1000.0f);
+            - switch.turn_on: silvia_pump_relay
+            - delay: !lambda |-
+                return (uint32_t)(id(silvia_brew_shot_seconds).state * 1000.0f);
+            - switch.turn_off: silvia_pump_relay
+            - switch.turn_off: silvia_brew_valve_relay
+            - lambda: 'id(brew_shot_running) = false;'
+          else:
+            - lambda: 'id(brew_shot_running) = false;'
+
   - id: auto_off_timer
     mode: restart
     then:
@@ -321,6 +584,7 @@ script:
           } else {
             id(auto_off_remaining_seconds) = (int)(id(silvia_auto_off_minutes).state * 60.0f);
           }
+      - script.execute: status_led_update
 
       - if:
           condition:
@@ -499,15 +763,13 @@ button:
             - climate.pid.autotune:
                 id: silvia_brew_pid
                 noiseband: 0.25
-                positive_output: 0.3
+                positive_output: 1.0
                 negative_output: 0.0
           else:
             - logger.log: "Silvia PID autotune blocked: machine power is OFF"
             - lambda: |-
                 id(pid_autotune_status) = 3;
                 id(silvia_pid_autotune_status).publish_state("Blocked | machine power is OFF");
-
-
 
 # -------------------------
 # Статусы
@@ -638,6 +900,8 @@ sensor:
           - output.set_level:
               id: silvia_pid_heat_output
               level: 0%
+          - switch.turn_off: silvia_pump_relay
+          - switch.turn_off: silvia_brew_valve_relay
           - switch.turn_off: silvia_power_relay
 
       
@@ -808,6 +1072,66 @@ climate:
 
       
 select:
+  - platform: template
+    name: "Silvia Brew Profile"
+    id: silvia_brew_profile
+    optimistic: true
+    restore_value: true
+    options:
+      - "Classic"
+      - "Soft Preinfusion"
+      - "Long Preinfusion"
+      - "Custom"
+    initial_option: "Classic"
+    set_action:
+      - if:
+          condition:
+            lambda: 'return x == "Classic";'
+          then:
+            - lambda: 'id(brew_profile_applying) = true;'
+            - number.set:
+                id: silvia_preinfusion_pump_seconds
+                value: 0
+            - number.set:
+                id: silvia_preinfusion_pause_seconds
+                value: 0
+            - number.set:
+                id: silvia_brew_shot_seconds
+                value: 25
+            - lambda: 'id(brew_profile_applying) = false;'
+
+      - if:
+          condition:
+            lambda: 'return x == "Soft Preinfusion";'
+          then:
+            - lambda: 'id(brew_profile_applying) = true;'
+            - number.set:
+                id: silvia_preinfusion_pump_seconds
+                value: 2
+            - number.set:
+                id: silvia_preinfusion_pause_seconds
+                value: 5
+            - number.set:
+                id: silvia_brew_shot_seconds
+                value: 25
+            - lambda: 'id(brew_profile_applying) = false;'
+
+      - if:
+          condition:
+            lambda: 'return x == "Long Preinfusion";'
+          then:
+            - lambda: 'id(brew_profile_applying) = true;'
+            - number.set:
+                id: silvia_preinfusion_pump_seconds
+                value: 3
+            - number.set:
+                id: silvia_preinfusion_pause_seconds
+                value: 10
+            - number.set:
+                id: silvia_brew_shot_seconds
+                value: 28
+            - lambda: 'id(brew_profile_applying) = false;'
+
   - platform: template
     name: "Silvia PID Mode"
     id: silvia_pid_mode

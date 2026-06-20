@@ -6,7 +6,7 @@
 
 An ESP32-S3, ESPHome, and Home Assistant modernization project for the Rancilio Silvia espresso machine.
 
-The project controls machine power and boiler heating, measures boiler temperature with a PT100 and MAX31865, and provides separate PID modes for brewing and steaming.
+The project controls machine power, boiler heating, brew shot, hot water, and steam mode. It measures boiler temperature with a PT100 and MAX31865, provides separate PID modes for brewing and steaming, and exposes the machine to Home Assistant.
 
 > [!WARNING]
 > The espresso machine contains hazardous mains voltage and a hot pressurized boiler. ESPHome is not a replacement for the original thermostat, thermal fuse, protective earth, or any other hardware safety device. Never work on the machine while it is connected to mains power.
@@ -28,7 +28,14 @@ https://github.com/user-attachments/assets/92bf4580-1ab9-4535-a1f1-395bb5a3d315
 - PID parameter controls and autotune from Home Assistant
 - automatic saving of successful autotune coefficients
 - original power button support
-- automatic shutdown timer
+- physical low-voltage inputs for brew shot, hot water, and steam mode
+- Home Assistant controls for brew shot, hot water, steam mode, pump relay, and brew-valve relay
+- timed brew shot control
+- brew profiles: `Classic`, `Soft Preinfusion`, `Long Preinfusion`, and `Custom`
+- configurable preinfusion pump time, preinfusion pause, and shot duration
+- manual pump and brew-valve relay control
+- inactivity-based automatic shutdown timer
+- auto-off timer reset on brew shot, hot water, steam mode, and manual pump/valve activity
 - status LED
 - water-level sensor input
 - configurable software overtemperature guard
@@ -61,7 +68,30 @@ https://github.com/user-attachments/assets/92bf4580-1ab9-4535-a1f1-395bb5a3d315
 
 ## Configuration
 
-The brew temperature, steam temperature, and automatic shutdown time are adjustable from Home Assistant. Values stored in the YAML file are initial defaults, not fixed machine specifications.
+The brew temperature, steam temperature, brew profile, preinfusion timings, shot duration, and automatic shutdown time are adjustable from Home Assistant. Values stored in the YAML file are initial defaults, not fixed machine specifications.
+
+### Brew shot and profiles
+
+`Silvia Brew Shot` starts an automated shot sequence:
+
+1. open the brew valve;
+2. optionally run the pump for preinfusion;
+3. optionally pause after preinfusion;
+4. run the pump for the configured shot duration;
+5. stop the pump and close the brew valve.
+
+The `Silvia Brew Profile` select provides three presets and a custom mode:
+
+- `Classic`: no preinfusion, 25 s shot;
+- `Soft Preinfusion`: 2 s pump, 5 s pause, 25 s shot;
+- `Long Preinfusion`: 3 s pump, 10 s pause, 28 s shot;
+- `Custom`: selected automatically when the timing numbers are edited manually.
+
+`Silvia Hot Water` runs the pump without opening the brew valve. `Silvia Steam Mode` switches the PID target to the steam profile and returns to brew mode when turned off.
+
+### Automatic shutdown
+
+`Silvia Auto Off Minutes` is an inactivity timer. When the machine is powered on, the countdown starts. It restarts when brew shot, hot water, steam mode, pump relay, or brew-valve relay activity begins. Setting the value to `0` disables automatic shutdown.
 
 ### Brew temperature model
 

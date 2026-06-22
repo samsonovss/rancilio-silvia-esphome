@@ -139,6 +139,21 @@ globals:
     restore_value: no
     initial_value: 'false'
 
+  - id: backflush_stage
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  - id: backflush_cycle
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  - id: backflush_phase_end_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
 interval:
   - interval: 1s
     then:
@@ -192,6 +207,15 @@ interval:
           id(silvia_brew_shot_remaining).publish_state(remaining_seconds);
           id(silvia_brew_shot_status).publish_state(
               str_sprintf("%s: %d с", phase, remaining_seconds));
+
+      - lambda: |-
+          if (!id(backflush_running) || id(backflush_stage) != 2) {
+            return;
+          }
+
+          const int32_t remaining_ms = (int32_t) (id(backflush_phase_end_ms) - millis());
+          id(backflush_cycle) = remaining_ms > 0 ? (remaining_ms + 999) / 1000 : 0;
+          id(silvia_backflush_status).update();
     
 # -------------------------
 # Настраиваемые параметры в HA
@@ -385,6 +409,17 @@ number:
     min_value: 0
     max_value: 150
     step: 1
+    mode: box
+
+  - platform: template
+    name: "Silvia Backflush Rinse Delay Seconds"
+    id: silvia_backflush_rinse_delay_seconds
+    optimistic: true
+    restore_value: true
+    initial_value: 60
+    min_value: 30
+    max_value: 180
+    step: 5
     mode: box
 
   - platform: template
@@ -713,31 +748,60 @@ script:
           then:
             - script.execute: auto_off_timer
             - script.execute: status_led_update
-            - lambda: 'id(backflush_running) = true;'
+            - lambda: |-
+                id(backflush_running) = true;
+                id(backflush_stage) = 1;
+                id(backflush_cycle) = 0;
+                id(backflush_phase_end_ms) = 0;
+                id(silvia_backflush_status).update();
             - switch.turn_off: silvia_pump_relay
             - switch.turn_off: silvia_brew_valve_relay
             - repeat:
-                count: 5
+                count: 8
                 then:
+                  - lambda: |-
+                      id(backflush_cycle)++;
+                      id(silvia_backflush_status).update();
                   - switch.turn_on: silvia_brew_valve_relay
                   - switch.turn_on: silvia_pump_relay
-                  - delay: 8s
+                  - delay: 5s
                   - switch.turn_off: silvia_pump_relay
                   - switch.turn_off: silvia_brew_valve_relay
                   - delay: 10s
-            - delay: 60s
+            - lambda: |-
+                const int seconds = (int) (id(silvia_backflush_rinse_delay_seconds).state + 0.999f);
+                id(backflush_stage) = 2;
+                id(backflush_cycle) = seconds;
+                id(backflush_phase_end_ms) =
+                    millis() + (uint32_t) (id(silvia_backflush_rinse_delay_seconds).state * 1000.0f);
+                id(silvia_backflush_status).update();
+            - delay: !lambda |-
+                return (uint32_t)(id(silvia_backflush_rinse_delay_seconds).state * 1000.0f);
+            - lambda: |-
+                id(backflush_stage) = 3;
+                id(backflush_cycle) = 0;
+                id(backflush_phase_end_ms) = 0;
+                id(silvia_backflush_status).update();
+            - switch.turn_off: silvia_pump_relay
+            - switch.turn_off: silvia_brew_valve_relay
             - repeat:
                 count: 8
                 then:
+                  - lambda: |-
+                      id(backflush_cycle)++;
+                      id(silvia_backflush_status).update();
                   - switch.turn_on: silvia_brew_valve_relay
                   - switch.turn_on: silvia_pump_relay
-                  - delay: 8s
+                  - delay: 5s
                   - switch.turn_off: silvia_pump_relay
                   - switch.turn_off: silvia_brew_valve_relay
                   - delay: 10s
             - lambda: |-
                 id(backflush_shots) = 0;
                 id(backflush_running) = false;
+                id(backflush_stage) = 0;
+                id(backflush_cycle) = 0;
+                id(backflush_phase_end_ms) = 0;
                 id(silvia_backflush_shots_sensor).publish_state(id(backflush_shots));
                 id(silvia_backflush_status).update();
             - script.execute: status_led_update
@@ -953,6 +1017,9 @@ button:
       - switch.turn_off: silvia_brew_valve_relay
       - lambda: |-
           id(backflush_running) = false;
+          id(backflush_stage) = 0;
+          id(backflush_cycle) = 0;
+          id(backflush_phase_end_ms) = 0;
           id(silvia_backflush_status).update();
       - script.execute: status_led_update
 
@@ -1178,6 +1245,15 @@ text_sensor:
     update_interval: 10s
     lambda: |-
       if (id(backflush_running)) {
+        if (id(backflush_stage) == 1) {
+          return {str_sprintf("Cleaning | %d/8 cycles", id(backflush_cycle))};
+        }
+        if (id(backflush_stage) == 3) {
+          return {str_sprintf("Rinsing | %d/8 cycles", id(backflush_cycle))};
+        }
+        if (id(backflush_stage) == 2) {
+          return {str_sprintf("Prepare rinse | %d s", id(backflush_cycle))};
+        }
         return {"Backflush running"};
       }
       const int shots = id(backflush_shots);

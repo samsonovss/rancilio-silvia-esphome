@@ -187,14 +187,22 @@ This is an estimate of ground coffee consumption, not the beverage weight in the
 `Silvia Start Backflush` runs a one-button staged cleaning sequence intended for a blind basket:
 
 1. Detergent stage: `8` cycles of `5 s` pump/valve on and `10 s` off.
-2. Rinse preparation delay: the machine stops and `Silvia Backflush Status` counts down `Prepare rinse | N s`. During this pause, remove the portafilter, rinse out the detergent, clean the blind basket, and lock the clean blind basket back in.
+2. Rinse preparation delay: the machine stops and `Silvia Backflush Status` counts down `Prepare rinse | N s`. During this pause, remove the portafilter, rinse out the detergent, clean the blind basket, empty the drip tray if needed, and lock the clean blind basket back in.
 3. Clean-water rinse stage: `8` more cycles of `5 s` on and `10 s` off, with no detergent.
 
-`Silvia Backflush Rinse Delay Seconds` controls the pause between the detergent and rinse stages. The default is `60 s`, adjustable from Home Assistant.
+`Silvia Backflush Rinse Delay Seconds` controls the pause between the detergent and rinse stages. The default is `120 s`, adjustable from Home Assistant.
 
 During the program, `Silvia Backflush Status` reports `Cleaning | N/8 cycles`, `Prepare rinse | N s`, and `Rinsing | N/8 cycles`. The backflush shot counter is reset only after the clean-water rinse stage completes.
 
 `Silvia Stop Backflush` aborts the running sequence and turns off the pump and valve. `Silvia Reset Backflush Shots` manually clears the reminder counter.
+
+Recommended workflow:
+
+1. Warm up the machine, insert the blind basket, add the backflush detergent, and press `Silvia Start Backflush`.
+2. Wait until the first stage finishes and the status changes to `Prepare rinse | N s`.
+3. During the countdown, remove the portafilter, discard/rinse out the detergent, rinse the portafilter and blind basket, and empty the drip tray if it is getting full.
+4. Reinstall the clean blind basket without detergent before the countdown reaches zero.
+5. Let the clean-water rinse stage finish. When it completes, the backflush reminder counter is reset.
 
 ### Brew Temperature Model
 

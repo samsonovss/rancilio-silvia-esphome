@@ -416,7 +416,7 @@ number:
     id: silvia_backflush_rinse_delay_seconds
     optimistic: true
     restore_value: true
-    initial_value: 60
+    initial_value: 120
     min_value: 30
     max_value: 180
     step: 5

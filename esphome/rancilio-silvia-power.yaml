@@ -68,6 +68,10 @@ substitutions:
   max31865_cs_pin: GPIO14
   water_level_pin: GPIO18
   overtemp_limit: "155.0"
+  # Future RobotDyn AC dimmer placeholder.
+  # Keep commented until the dimmer is wired and tested.
+  # pump_dimmer_gate_pin: GPIOXX
+  # pump_dimmer_zero_cross_pin: GPIOXX
 
 # -------------------------
 # Внутренние переменные
@@ -361,6 +365,21 @@ number:
               - select.set:
                   id: silvia_brew_profile
                   option: "Custom"
+
+  - platform: template
+    name: "Silvia Manual Pump Power"
+    id: silvia_manual_pump_power
+    optimistic: true
+    restore_value: true
+    initial_value: 100
+    min_value: 20
+    max_value: 100
+    step: 5
+    unit_of_measurement: "%"
+    mode: slider
+    on_value:
+      then:
+        - component.update: silvia_pump_profile_preview
 
   - platform: template
     name: "Silvia Brew Target"
@@ -1231,6 +1250,30 @@ text_sensor:
     update_interval: never
 
   - platform: template
+    name: "Silvia Pump Profile Preview"
+    id: silvia_pump_profile_preview
+    icon: "mdi:sine-wave"
+    update_interval: 10s
+    lambda: |-
+      const std::string profile = id(silvia_pump_profile).current_option();
+      if (profile == "Classic") {
+        return {"Классика | помпа 100%"};
+      }
+      if (profile == "Lever") {
+        return {"Lever | плавный рост и спад мощности"};
+      }
+      if (profile == "Slayer Style") {
+        return {"Slayer | мягкое начало, затем основной пролив"};
+      }
+      if (profile == "Bloom") {
+        return {"Bloom | смачивание, пауза, затем пролив"};
+      }
+      if (profile == "Turbo") {
+        return {"Turbo | быстрый высокий поток"};
+      }
+      return {str_sprintf("Manual | %.0f%% мощности", id(silvia_manual_pump_power).state)};
+
+  - platform: template
     name: "Silvia Water Status"
     update_interval: 2s
     lambda: |-
@@ -1461,6 +1504,22 @@ select:
                 id: silvia_brew_shot_seconds
                 value: 28
             - lambda: 'id(brew_profile_applying) = false;'
+
+  - platform: template
+    name: "Silvia Pump Profile"
+    id: silvia_pump_profile
+    optimistic: true
+    restore_value: true
+    options:
+      - "Classic"
+      - "Lever"
+      - "Slayer Style"
+      - "Bloom"
+      - "Turbo"
+      - "Manual"
+    initial_option: "Classic"
+    set_action:
+      - component.update: silvia_pump_profile_preview
 
   - platform: template
     name: "Silvia PID Mode"

@@ -75,6 +75,7 @@ Planned additions:
 - brew profiles: `Classic`, `Soft Preinfusion`, `Long Preinfusion`, and `Custom`;
 - configurable preinfusion pump time, preinfusion pause, and main shot duration;
 - live brew-shot phase status with countdown;
+- pump power profile placeholders for the planned RobotDyn AC dimmer;
 - physical low-voltage brew shot input;
 - manual pump and brew-valve relay controls.
 
@@ -169,6 +170,19 @@ Adjustable values include:
 
 The dashboard can use this status as the primary live shot timer instead of inferring the phase from entity timestamps.
 
+`Silvia Pump Profile` is a future-ready selector for pump-power profiling. It is safe in the current build: it only exposes the UI and profile preview, while the pump still runs through the existing relay output.
+
+Prepared pump profiles:
+
+- `Classic`: normal 100% pump behavior;
+- `Lever`: planned ramp-up and ramp-down pump curve;
+- `Slayer Style`: planned soft low-flow start followed by the main shot;
+- `Bloom`: planned wetting phase, pause, then main shot;
+- `Turbo`: planned fast high-flow shot;
+- `Manual`: planned fixed pump power from `Silvia Manual Pump Power`.
+
+The actual RobotDyn AC dimmer output is intentionally left as a commented placeholder until the dimmer is wired and tested.
+
 ### Coffee Usage
 
 `Silvia Coffee Dose Grams` stores the configured dry coffee dose per shot. The default is `14 g`, and the value can be changed from Home Assistant.
@@ -233,9 +247,9 @@ The estimated brew temperature is a model, not a direct water measurement. Keep 
 ## Roadmap
 
 - Add a digital I2C pressure sensor for brew pressure measurement.
-- Use pressure feedback for pressure profiling.
-- Experiment with the one-channel RobotDyn AC dimmer for pump power control.
-- Update the Home Assistant dashboard for pressure graphs and profile controls.
+- Enable the prepared RobotDyn AC dimmer output and test pump-power profiles.
+- Use pressure feedback for closed-loop pressure profiling.
+- Update the Home Assistant dashboard with pressure graphs.
 - Design a dedicated PCB with proper connectors.
 - Expand wiring and Home Assistant documentation.
 

@@ -37,7 +37,9 @@ https://github.com/user-attachments/assets/92bf4580-1ab9-4535-a1f1-395bb5a3d315
 - timed brew shot control
 - brew profiles: `Classic`, `Soft Preinfusion`, `Long Preinfusion`, and `Custom`
 - configurable preinfusion pump time, preinfusion pause, and shot duration
+- live brew-shot phase status with countdown for preinfusion, pause, and shot time
 - shot-count based backflush reminder and automated backflush program
+- configurable coffee dose and estimated coffee grounds usage based on completed shots
 - manual pump and brew-valve relay control
 - inactivity-based automatic shutdown timer
 - auto-off timer reset on brew shot, hot water, steam mode, and manual pump/valve activity
@@ -93,6 +95,25 @@ The `Silvia Brew Profile` select provides three presets and a custom mode:
 - `Custom`: selected automatically when the timing numbers are edited manually.
 
 `Silvia Hot Water` runs the pump without opening the brew valve. `Silvia Steam Mode` switches the PID target to the steam profile and returns to brew mode when turned off.
+
+### Shot status and coffee usage
+
+During an automated shot, `Silvia Brew Shot Status` reports the current phase and countdown. In the current configuration the published status strings are localized:
+
+- `Предсмачивание`: remaining preinfusion pump time;
+- `Пауза`: remaining pause time after preinfusion;
+- `Пролив`: remaining main brew time;
+- `Ожидание`: no automated shot is running.
+
+The Home Assistant dashboard can use this status as the primary live shot timer instead of trying to infer the current phase from entity timestamps.
+
+`Silvia Coffee Dose Grams` stores the configured dry coffee dose per shot. The default is `14 g`, and it can be adjusted from Home Assistant. `Silvia Coffee Grounds Used` estimates total dry coffee usage from the lifetime shot counter and the configured dose:
+
+```text
+Coffee Grounds Used = Silvia Lifetime Shots × Silvia Coffee Dose Grams
+```
+
+This is an estimate of ground coffee consumption, not the beverage weight in the cup.
 
 ### Backflush reminder and program
 

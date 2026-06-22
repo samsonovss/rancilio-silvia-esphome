@@ -12,6 +12,10 @@ esphome:
     - priority: -100
       then:
         - script.execute: apply_pid_parameters
+        - lambda: |-
+            id(silvia_brew_shot_remaining).publish_state(0);
+            id(silvia_brew_shot_status).publish_state("Ожидание");
+            id(silvia_backflush_status).update();
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -105,6 +109,16 @@ globals:
     restore_value: no
     initial_value: 'false'
 
+  - id: brew_shot_phase
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  - id: brew_shot_phase_end_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
   - id: hot_water_running
     type: bool
     restore_value: no
@@ -159,6 +173,25 @@ interval:
                 str_sprintf("Completed | KP %.5f | KI %.5f | KD %.5f", kp, ki, kd));
             ESP_LOGI("silvia.pid", "Autotune saved: KP %.5f, KI %.5f, KD %.5f", kp, ki, kd);
           }
+
+      - lambda: |-
+          if (!id(brew_shot_running)) {
+            return;
+          }
+
+          const int32_t remaining_ms = (int32_t) (id(brew_shot_phase_end_ms) - millis());
+          const int remaining_seconds = remaining_ms > 0 ? (remaining_ms + 999) / 1000 : 0;
+          const char *phase = "Пролив";
+
+          if (id(brew_shot_phase) == 1) {
+            phase = "Предсмачивание";
+          } else if (id(brew_shot_phase) == 2) {
+            phase = "Пауза";
+          }
+
+          id(silvia_brew_shot_remaining).publish_state(remaining_seconds);
+          id(silvia_brew_shot_status).publish_state(
+              str_sprintf("%s: %d с", phase, remaining_seconds));
     
 # -------------------------
 # Настраиваемые параметры в HA
@@ -353,6 +386,18 @@ number:
     max_value: 150
     step: 1
     mode: box
+
+  - platform: template
+    name: "Silvia Coffee Dose Grams"
+    id: silvia_coffee_dose_grams
+    optimistic: true
+    restore_value: true
+    initial_value: 14
+    min_value: 5
+    max_value: 25
+    step: 0.5
+    unit_of_measurement: "g"
+    mode: box
           
 # -------------------------
 # Реле включения машины
@@ -388,8 +433,12 @@ switch:
       - lambda: |-
           id(auto_off_remaining_seconds) = 0;
           id(brew_shot_running) = false;
+          id(brew_shot_phase) = 0;
+          id(brew_shot_phase_end_ms) = 0;
           id(hot_water_running) = false;
           id(backflush_running) = false;
+          id(silvia_brew_shot_remaining).publish_state(0);
+          id(silvia_brew_shot_status).publish_state("Ожидание");
 
   - platform: gpio
     name: "Silvia Pump Relay"
@@ -441,7 +490,12 @@ switch:
       - script.stop: brew_shot_timer
       - switch.turn_off: silvia_pump_relay
       - switch.turn_off: silvia_brew_valve_relay
-      - lambda: 'id(brew_shot_running) = false;'
+      - lambda: |-
+          id(brew_shot_running) = false;
+          id(brew_shot_phase) = 0;
+          id(brew_shot_phase_end_ms) = 0;
+          id(silvia_brew_shot_remaining).publish_state(0);
+          id(silvia_brew_shot_status).publish_state("Ожидание");
 
   - platform: template
     name: "Silvia Hot Water"
@@ -578,12 +632,24 @@ script:
           then:
             - lambda: |-
                 id(brew_shot_running) = true;
+                id(brew_shot_phase) = 0;
+                id(brew_shot_phase_end_ms) = millis();
                 id(hot_water_running) = false;
+                id(silvia_brew_shot_remaining).publish_state(0);
+                id(silvia_brew_shot_status).publish_state("Запуск");
             - switch.turn_on: silvia_brew_valve_relay
             - if:
                 condition:
                   lambda: 'return id(silvia_preinfusion_pump_seconds).state > 0.0f;'
                 then:
+                  - lambda: |-
+                      const int seconds = (int) (id(silvia_preinfusion_pump_seconds).state + 0.999f);
+                      id(brew_shot_phase) = 1;
+                      id(brew_shot_phase_end_ms) =
+                          millis() + (uint32_t) (id(silvia_preinfusion_pump_seconds).state * 1000.0f);
+                      id(silvia_brew_shot_remaining).publish_state(seconds);
+                      id(silvia_brew_shot_status).publish_state(
+                          str_sprintf("Предсмачивание: %d с", seconds));
                   - switch.turn_on: silvia_pump_relay
                   - delay: !lambda |-
                       return (uint32_t)(id(silvia_preinfusion_pump_seconds).state * 1000.0f);
@@ -592,8 +658,24 @@ script:
                 condition:
                   lambda: 'return id(silvia_preinfusion_pause_seconds).state > 0.0f;'
                 then:
+                  - lambda: |-
+                      const int seconds = (int) (id(silvia_preinfusion_pause_seconds).state + 0.999f);
+                      id(brew_shot_phase) = 2;
+                      id(brew_shot_phase_end_ms) =
+                          millis() + (uint32_t) (id(silvia_preinfusion_pause_seconds).state * 1000.0f);
+                      id(silvia_brew_shot_remaining).publish_state(seconds);
+                      id(silvia_brew_shot_status).publish_state(
+                          str_sprintf("Пауза: %d с", seconds));
                   - delay: !lambda |-
                       return (uint32_t)(id(silvia_preinfusion_pause_seconds).state * 1000.0f);
+            - lambda: |-
+                const int seconds = (int) (id(silvia_brew_shot_seconds).state + 0.999f);
+                id(brew_shot_phase) = 3;
+                id(brew_shot_phase_end_ms) =
+                    millis() + (uint32_t) (id(silvia_brew_shot_seconds).state * 1000.0f);
+                id(silvia_brew_shot_remaining).publish_state(seconds);
+                id(silvia_brew_shot_status).publish_state(
+                    str_sprintf("Пролив: %d с", seconds));
             - switch.turn_on: silvia_pump_relay
             - delay: !lambda |-
                 return (uint32_t)(id(silvia_brew_shot_seconds).state * 1000.0f);
@@ -601,13 +683,22 @@ script:
             - switch.turn_off: silvia_brew_valve_relay
             - lambda: |-
                 id(brew_shot_running) = false;
+                id(brew_shot_phase) = 0;
+                id(brew_shot_phase_end_ms) = 0;
+                id(silvia_brew_shot_remaining).publish_state(0);
+                id(silvia_brew_shot_status).publish_state("Ожидание");
                 id(backflush_shots)++;
                 id(lifetime_shots)++;
                 id(silvia_backflush_shots_sensor).publish_state(id(backflush_shots));
                 id(silvia_lifetime_shots_sensor).publish_state(id(lifetime_shots));
                 id(silvia_backflush_status).update();
           else:
-            - lambda: 'id(brew_shot_running) = false;'
+            - lambda: |-
+                id(brew_shot_running) = false;
+                id(brew_shot_phase) = 0;
+                id(brew_shot_phase_end_ms) = 0;
+                id(silvia_brew_shot_remaining).publish_state(0);
+                id(silvia_brew_shot_status).publish_state("Ожидание");
 
   - id: backflush_program
     mode: single
@@ -897,6 +988,13 @@ sensor:
       return id(auto_off_remaining_seconds) / 60.0f;
 
   - platform: template
+    name: "Silvia Brew Shot Remaining"
+    id: silvia_brew_shot_remaining
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    update_interval: never
+
+  - platform: template
     name: "Silvia Backflush Shots"
     id: silvia_backflush_shots_sensor
     accuracy_decimals: 0
@@ -911,6 +1009,15 @@ sensor:
     update_interval: 60s
     lambda: |-
       return id(lifetime_shots);
+
+  - platform: template
+    name: "Silvia Coffee Grounds Used"
+    id: silvia_coffee_grounds_used
+    unit_of_measurement: "g"
+    accuracy_decimals: 1
+    update_interval: 60s
+    lambda: |-
+      return id(lifetime_shots) * id(silvia_coffee_dose_grams).state;
 
   - platform: template
     name: "Silvia Brew Target Sensor"
@@ -1050,6 +1157,12 @@ text_sensor:
       return {"Auto-off active"};
 
   - platform: template
+    name: "Silvia Brew Shot Status"
+    id: silvia_brew_shot_status
+    icon: "mdi:timer-sand"
+    update_interval: never
+
+  - platform: template
     name: "Silvia Water Status"
     update_interval: 2s
     lambda: |-
@@ -1068,7 +1181,11 @@ text_sensor:
         return {"Backflush running"};
       }
       const int shots = id(backflush_shots);
-      const int reminder = (int) id(silvia_backflush_reminder_shots).state;
+      const float reminder_state = id(silvia_backflush_reminder_shots).state;
+      if (!std::isfinite(reminder_state)) {
+        return {"OK"};
+      }
+      const int reminder = (int) reminder_state;
       if (reminder <= 0) {
         return {"Reminder disabled"};
       }

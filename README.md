@@ -13,7 +13,7 @@ The project is more than an external PID retrofit. The goal is to move the machi
 > [!WARNING]
 > The espresso machine contains hazardous mains voltage and a hot pressurized boiler. ESPHome is not a replacement for the original thermostat, thermal fuse, protective earth, or any other hardware safety device. Never work on the machine while it is connected to mains power.
 
-![Home Assistant dashboard](images/dashboard.gif)
+[![Home Assistant dashboard](images/dashboard.gif)](images/dashboard.mp4)
 
 ## Current Status
 
